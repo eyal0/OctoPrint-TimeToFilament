@@ -19,9 +19,7 @@ $(function() {
     }
 
     self.fromCurrentData = function(data) {
-      console.log(data);
       if (!("progress" in data) || !("TimeToFilament" in data["progress"])) {
-        console.log("get rid of it!!!");
         let div = document.getElementById("TimeToFilament");
         if (div) {
           div.style.display = "none";
@@ -32,7 +30,6 @@ $(function() {
       const displayLines = self.settingsViewModel.settings.plugins.TimeToFilament.displayLines();
       for (const displayLine of displayLines) {
         const regex = displayLine.regex();
-        console.log(regex);
         if (regex in data["progress"]["TimeToFilament"]) {
           let found = document.getElementById("TimeToFilament-" + regex);
           if (!found) {
@@ -43,8 +40,6 @@ $(function() {
           // Back to default which is probably to show it.
           document.getElementById("TimeToFilament").style.display = "";
           result = data["progress"]["TimeToFilament"][regex];
-          console.log(result);
-          console.log("foo " + displayLine.format());
           const fillTemplate = function(templateString, templateVars){
             return new Function(`return \`${templateString}\`;`).call(templateVars);
           }

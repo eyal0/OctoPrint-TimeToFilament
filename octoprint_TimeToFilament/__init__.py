@@ -25,11 +25,11 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
             {"enabled": True,
              "description": "Time to Next Layer",
              "regex": "^; layer (\\d+)",
-             "format": 'Layer ${this.progress.TimeToFilament["^; layer (\\\\d+)"].groups[0]} <b>in</b> ${Math.round(this.progress.printTimeLeft - this.progress.TimeToFilament["^; layer (\\\\d+)"].timeLeft)} seconds'},
+             "format": 'Layer ${this.progress.TimeToFilament["^; layer (\\\\d+)"].groups[0]} in <b>${Math.round(this.progress.printTimeLeft - this.progress.TimeToFilament["^; layer (\\\\d+)"].timeLeft)} seconds</b>'},
             {"enabled": True,
              "description": "Time to Next Filament Change",
              "regex": "^M600",
-             "format": 'Layer ${this.progress.TimeToFilament["^M600"].groups[0]} <b>in</b> ${Math.round(this.progress.printTimeLeft - this.progress.TimeToFilament["^M600"].timeLeft)} seconds'}
+             "format": 'Filament change in <b>${Math.round(this.progress.printTimeLeft - this.progress.TimeToFilament["^M600"].timeLeft)} seconds</b>'}
         ]
     }
 
@@ -41,7 +41,6 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
         old_result = dd()
         old_result.update(old_callback())
         try:
-          print(self._cached_results)
           if printer._comm._currentFile is not self._cached_currentFile:
             self._cached_results = dd()
             self._cached_currentFile = printer._comm._currentFile
@@ -80,7 +79,7 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
                     regexes.remove(regex)
           old_result["TimeToFilament"].update(self._cached_results)
         except Exception as e:
-          print(e)
+          print("Failed: " + repr(e))
         for regex in list(old_result["TimeToFilament"].keys()):
           if old_result["TimeToFilament"][regex]["matchPos"] == float("inf"):
             del old_result["TimeToFilament"][regex]
