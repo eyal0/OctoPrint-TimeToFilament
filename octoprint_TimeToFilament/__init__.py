@@ -5,59 +5,76 @@ import types
 import re
 import logging
 import octoprint.plugin
+from collections import defaultdict
+
+dd = lambda: defaultdict(dd)
 
 class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
                            octoprint.plugin.AssetPlugin,
                            octoprint.plugin.TemplatePlugin,
                            octoprint.plugin.StartupPlugin):
 
+  def __init__(self):
+    self._cached_currentFile = None
+    self._cached_results = dd()
+
   ##~~ SettingsPlugin mixin
   def get_settings_defaults(self):
     return {
         "displayLines": [
-            {"enabled": true,
+            {"enabled": True,
              "description": "Time to Next Filament Change",
-             "regex": "^M600",
-             "format": "Filament Change in {secondsUntil} seconds"}
+             "regex": "^G",
+             "format": 'Filament Change in ${this.progress.printTimeLeft - this.progress.TimeToFilament["^G"].timeLeft} seconds'}
         ]
     }
 
   ##~~ StartupPlugin API
   def on_startup(self, host, port):
     def newUpdateProgressDataCallback(old_callback, printer):
-      def return_function(self):
-        old_result = dict(old_callback())
+      def return_function(state_monitor):
+        # Can we use the cached result?
+        old_result = dd()
+        old_result.update(old_callback())
         try:
-          print(printer._comm._currentFile.getFilename())
+          if printer._comm._currentFile is not self._cached_currentFile:
+            self._cached_results = dd()
+          for regex, cached_result in list(self._cached_results.items()):
+            if cached_result["matchPos"] < printer._comm._currentFile.getFilepos():
+              del self._cached_results[regex]
+          old_result["TimeToFilament"].update(self._cached_results)
+          regexes = set(x["regex"]
+                        for x in self._settings.get(["displayLines"])
+                        if x["enabled"] and (x["regex"] not in old_result["TimeToFilament"].keys()))
           with open(printer._comm._currentFile.getFilename()) as gcode_file:
             gcode_file.seek(printer._comm._currentFile.getFilepos())
             # Now search forward for the regex.
-            regexes = set(x["regex"]
-                          for x in self._settings["displayLines"]
-                          if x["enabled"])
             while regexes:
               line = gcode_file.readline()
-              print(line)
+              if not line:
+                # Ran out of lines and didn't find anything more.
+                for regex in list(regexes):
+                  self._cached_results[regex]["matchPos"] = float("inf")
+                break
               for regex in list(regexes): # Make a copy because we modify it.
                 m = re.match(regex, line)
-                print(m)
                 if m:
                   match_pos = gcode_file.tell()
                   timeLeft, timeOrigin = printer._estimator.estimate(
                       float(match_pos) / printer._comm._currentFile.getFilesize(),
                       None, None, None, None)
-                  print(printer._estimator)
-                  print(timeLeft)
-                  print(timeOrigin)
-                  if not "TimeToFilament" in old_result:
-                    old_result["TimeToFilament"] = dict()
-                  old_result["TimeToFilament"][regex] = {
+                  self._cached_results[regex] = {
                       "timeLeft": timeLeft,
-                      "match": m
+                      "groups": m.groups(),
+                      "group": m.group(),
+                      "groupdict": m.groupdict(),
+                      "matchPos": match_pos,
                   }
                   regexes.remove(regex)
+          old_result["TimeToFilament"].update(self._cached_results)
         except Exception as e:
           print(e)
+          raise
         finally:
           return old_result
       return return_function
