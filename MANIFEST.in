@@ -1,0 +1,4 @@
+include README.md
+recursive-include octoprint_TimeToFilament/templates *
+recursive-include octoprint_TimeToFilament/translations *
+recursive-include octoprint_TimeToFilament/static *
