@@ -48,7 +48,7 @@ $(function() {
           const fillTemplate = function(templateString, templateVars){
             return new Function(`return \`${templateString}\`;`).call(templateVars);
           }
-          document.getElementById("TimeToFilament-" + regex).innerText = fillTemplate(displayLine.format(), data);
+          document.getElementById("TimeToFilament-" + regex).innerHTML = fillTemplate(displayLine.format(), data);
         } else {
           let found = document.getElementById("TimeToFilament-" + regex);
           if (found) {

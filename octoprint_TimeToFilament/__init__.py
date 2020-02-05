@@ -23,9 +23,13 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
     return {
         "displayLines": [
             {"enabled": True,
+             "description": "Time to Next Layer",
+             "regex": "^; layer (\\d+)",
+             "format": 'Layer ${this.progress.TimeToFilament["^; layer (\\\\d+)"].groups[0]} <b>in</b> ${Math.round(this.progress.printTimeLeft - this.progress.TimeToFilament["^; layer (\\\\d+)"].timeLeft)} seconds'},
+            {"enabled": True,
              "description": "Time to Next Filament Change",
-             "regex": "^G",
-             "format": 'Filament Change in ${this.progress.printTimeLeft - this.progress.TimeToFilament["^G"].timeLeft} seconds'}
+             "regex": "^M600",
+             "format": 'Layer ${this.progress.TimeToFilament["^M600"].groups[0]} <b>in</b> ${Math.round(this.progress.printTimeLeft - this.progress.TimeToFilament["^M600"].timeLeft)} seconds'}
         ]
     }
 
@@ -37,8 +41,10 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
         old_result = dd()
         old_result.update(old_callback())
         try:
+          print(self._cached_results)
           if printer._comm._currentFile is not self._cached_currentFile:
             self._cached_results = dd()
+            self._cached_currentFile = printer._comm._currentFile
           for regex, cached_result in list(self._cached_results.items()):
             if cached_result["matchPos"] < printer._comm._currentFile.getFilepos():
               del self._cached_results[regex]
@@ -46,37 +52,39 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
           regexes = set(x["regex"]
                         for x in self._settings.get(["displayLines"])
                         if x["enabled"] and (x["regex"] not in old_result["TimeToFilament"].keys()))
-          with open(printer._comm._currentFile.getFilename()) as gcode_file:
-            gcode_file.seek(printer._comm._currentFile.getFilepos())
-            # Now search forward for the regex.
-            while regexes:
-              line = gcode_file.readline()
-              if not line:
-                # Ran out of lines and didn't find anything more.
-                for regex in list(regexes):
-                  self._cached_results[regex]["matchPos"] = float("inf")
-                break
-              for regex in list(regexes): # Make a copy because we modify it.
-                m = re.match(regex, line)
-                if m:
-                  match_pos = gcode_file.tell()
-                  timeLeft, timeOrigin = printer._estimator.estimate(
-                      float(match_pos) / printer._comm._currentFile.getFilesize(),
-                      None, None, None, None)
-                  self._cached_results[regex] = {
-                      "timeLeft": timeLeft,
-                      "groups": m.groups(),
-                      "group": m.group(),
-                      "groupdict": m.groupdict(),
-                      "matchPos": match_pos,
-                  }
-                  regexes.remove(regex)
+          if regexes:
+            with open(printer._comm._currentFile.getFilename()) as gcode_file:
+              gcode_file.seek(printer._comm._currentFile.getFilepos())
+              # Now search forward for the regex.
+              while regexes:
+                line = gcode_file.readline()
+                if not line:
+                  # Ran out of lines and didn't find anything more.
+                  for regex in list(regexes):
+                    self._cached_results[regex]["matchPos"] = float("inf")
+                  break
+                for regex in list(regexes): # Make a copy because we modify it.
+                  m = re.search(regex, line)
+                  if m:
+                    match_pos = gcode_file.tell()
+                    timeLeft, timeOrigin = printer._estimator.estimate(
+                        float(match_pos) / printer._comm._currentFile.getFilesize(),
+                        None, None, None, None)
+                    self._cached_results[regex] = {
+                        "timeLeft": timeLeft,
+                        "groups": m.groups(),
+                        "group": m.group(),
+                        "groupdict": m.groupdict(),
+                        "matchPos": match_pos,
+                    }
+                    regexes.remove(regex)
           old_result["TimeToFilament"].update(self._cached_results)
         except Exception as e:
           print(e)
-          raise
-        finally:
-          return old_result
+        for regex in list(old_result["TimeToFilament"].keys()):
+          if old_result["TimeToFilament"][regex]["matchPos"] == float("inf"):
+            del old_result["TimeToFilament"][regex]
+        return old_result
       return return_function
     self._printer._stateMonitor._on_get_progress = types.MethodType(newUpdateProgressDataCallback(
         self._printer._stateMonitor._on_get_progress, self._printer), self._printer._stateMonitor)
