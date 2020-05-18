@@ -37,11 +37,13 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
   def on_startup(self, host, port):
     def newUpdateProgressDataCallback(old_callback, printer):
       def return_function(state_monitor):
-        # Can we use the cached result?
         old_result = dd()
+        # Get the results from the original callback, to be updated.
         old_result.update(old_callback())
         try:
+          # Can we use the cached result?
           if printer._comm._currentFile is not self._cached_currentFile:
+            # No, we need to clear out the cache.
             self._cached_results = dd()
             self._cached_currentFile = printer._comm._currentFile
           for regex, cached_result in list(self._cached_results.items()):
