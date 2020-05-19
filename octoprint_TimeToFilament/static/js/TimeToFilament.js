@@ -112,6 +112,7 @@ $(function() {
           if (!found) {
             let newLine = document.createElement("span");
             newLine.id = "TimeToFilament-" + regex;
+            newLine.style = "display: block;";
             document.getElementById("TimeToFilament").appendChild(newLine);
           }
           // Back to default which is probably to show it.
