@@ -3,12 +3,12 @@ from __future__ import absolute_import
 
 import types
 import re
-import logging
 import octoprint.plugin
 import json
 from collections import defaultdict
 
 dd = lambda: defaultdict(dd)
+
 
 class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
                            octoprint.plugin.AssetPlugin,
@@ -27,11 +27,11 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
             {"enabled": True,
              "description": "Time to Next Layer",
              "regex": "^; layer (\\d+)",
-             "format": 'Layer ${this.progress.TimeToFilament["^; layer (\\\\d+)"].groups[0]} in <b>${Math.round(this.progress.printTimeLeft - this.progress.TimeToFilament["^; layer (\\\\d+)"].timeLeft)} seconds</b>'},
+             "format": 'Layer ${this.progress.TimeToFilament["^; layer (\\\\d+)"].groups[0]} in <b>${formatDuration(this.progress.printTimeLeft - this.progress.TimeToFilament["^; layer (\\\\d+)"].timeLeft)} seconds</b>'},
             {"enabled": True,
              "description": "Time to Next Filament Change",
              "regex": "^M600",
-             "format": 'Filament change in <b>${Math.round(this.progress.printTimeLeft - this.progress.TimeToFilament["^M600"].timeLeft)} seconds</b>'}
+             "format": 'Filament change in <b>${formatDuration(this.progress.printTimeLeft - this.progress.TimeToFilament["^M600"].timeLeft)} seconds</b>'}
         ]
     }
 
