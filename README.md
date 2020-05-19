@@ -1,6 +1,8 @@
 # OctoPrint-TimeToFilament
 
-**TODO:** Describe what your plugin does.
+Put estimations of the time until *whatever* on the OctoPrint screen.  For example:
+
+![Time until layer chnage and time until filament change in OctoPrint window.](https://raw.githubusercontent.com/eyal0/OctoPrint-TimeToFilament/master/extras/screenshot.png)
 
 ## Setup
 
