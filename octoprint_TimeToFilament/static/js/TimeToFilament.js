@@ -5,17 +5,35 @@
  * License: AGPLv3
  */
 $(function() {
-  function TimetofilamentViewModel(parameters) {
+  function TimeToFilamentViewModel(parameters) {
     var self = this;
 
     self.settingsViewModel = parameters[0];
 
     self.onBeforeBinding = function() {
+      let settings = self.settingsViewModel.settings;
+      let timeToFilamentSettings = settings.plugins.TimeToFilament;
+      self.displayLines = timeToFilamentSettings.displayLines;
       printElement = document.evaluate('//*[@id="state"]/div/span[text() = "Printed"]', document);
       printElement = printElement.iterateNext();
       newDiv = document.createElement("div");
       newDiv.id = "TimeToFilament";
       printElement.parentNode.insertBefore(newDiv, printElement);
+    }
+
+    self.resetToDefault = function() {
+      OctoPrint.get(OctoPrint.getBlueprintUrl("TimeToFilament") + "get_settings_defaults").done(
+        function (defaults) {
+          self.displayLines(defaults['displayLines']);
+        });
+    }
+
+    self.addLine = function() {
+      self.displayLines.push({description: "", regex: "", format: "", enabled: true});
+    }
+
+    self.removeLine = function(line) {
+      self.displayLines.remove(line);
     }
 
     self.fromCurrentData = function(data) {
@@ -58,10 +76,10 @@ $(function() {
    * and a full list of the available options.
    */
   OCTOPRINT_VIEWMODELS.push({
-    construct: TimetofilamentViewModel,
+    construct: TimeToFilamentViewModel,
     // ViewModels your plugin depends on, e.g. loginStateViewModel, settingsViewModel, ...
     dependencies: [ "settingsViewModel" ],
     // Elements to bind to, e.g. #settings_plugin_TimeToFilament, #tab_plugin_TimeToFilament, ...
-    elements: [ /* ... */ ]
+    elements: [ "#settings_plugin_TimeToFilament" ]
   });
 });

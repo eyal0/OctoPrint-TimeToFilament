@@ -5,6 +5,7 @@ import types
 import re
 import logging
 import octoprint.plugin
+import json
 from collections import defaultdict
 
 dd = lambda: defaultdict(dd)
@@ -12,7 +13,8 @@ dd = lambda: defaultdict(dd)
 class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
                            octoprint.plugin.AssetPlugin,
                            octoprint.plugin.TemplatePlugin,
-                           octoprint.plugin.StartupPlugin):
+                           octoprint.plugin.StartupPlugin,
+                           octoprint.plugin.BlueprintPlugin):
 
   def __init__(self):
     self._cached_currentFile = None
@@ -90,6 +92,9 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
     self._printer._stateMonitor._on_get_progress = types.MethodType(newUpdateProgressDataCallback(
         self._printer._stateMonitor._on_get_progress, self._printer), self._printer._stateMonitor)
 
+  @octoprint.plugin.BlueprintPlugin.route("/get_settings_defaults", methods=["GET"])
+  def get_settings_defaults_as_string(self):
+    return json.dumps(self.get_settings_defaults())
 
   ##~~ AssetPlugin mixin
   def get_assets(self):
