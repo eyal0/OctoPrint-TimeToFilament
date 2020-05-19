@@ -48,8 +48,10 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
             # No, we need to clear out the cache.
             self._cached_results = dd()
             self._cached_currentFile = printer._comm._currentFile
+          file_pos = printer._comm._currentFile.getFilepos()
           for regex, cached_result in list(self._cached_results.items()):
-            if cached_result["matchPos"] < printer._comm._currentFile.getFilepos():
+            if (file_pos > cached_result["matchPos"] or
+                file_pos < cached_result["searchPos"]):
               del self._cached_results[regex]
           old_result["TimeToFilament"].update(self._cached_results)
           regexes = set(x["regex"]
@@ -57,7 +59,7 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
                         if x["enabled"] and (x["regex"] not in old_result["TimeToFilament"].keys()))
           if regexes:
             with open(printer._comm._currentFile.getFilename()) as gcode_file:
-              gcode_file.seek(printer._comm._currentFile.getFilepos())
+              gcode_file.seek(file_pos)
               # Now search forward for the regex.
               while regexes:
                 line = gcode_file.readline()
@@ -65,6 +67,7 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
                   # Ran out of lines and didn't find anything more.
                   for regex in list(regexes):
                     self._cached_results[regex]["matchPos"] = float("inf")
+                    self._cached_results[regex]["searchPos"] = file_pos
                   break
                 for regex in list(regexes): # Make a copy because we modify it.
                   m = re.search(regex, line)
@@ -79,6 +82,7 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
                         "group": m.group(),
                         "groupdict": m.groupdict(),
                         "matchPos": match_pos,
+                        "searchPos": file_pos,
                     }
                     regexes.remove(regex)
           old_result["TimeToFilament"].update(self._cached_results)
