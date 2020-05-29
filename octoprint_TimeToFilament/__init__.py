@@ -5,6 +5,8 @@ import types
 import re
 import octoprint.plugin
 import json
+import logging
+import time
 from collections import defaultdict
 
 dd = lambda: defaultdict(dd)
@@ -17,6 +19,8 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
                            octoprint.plugin.BlueprintPlugin):
 
   def __init__(self):
+    self._logger = logging.getLogger(__name__)
+    self._last_debug = 0
     self._cached_currentFile = None
     self._cached_results = dd()
 
@@ -37,6 +41,15 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
 
   ##~~ StartupPlugin API
   def on_startup(self, host, port):
+     # setup our custom logger
+    from octoprint.logging.handlers import CleaningTimedRotatingFileHandler
+    logging_handler = CleaningTimedRotatingFileHandler(self._settings.get_plugin_logfile_path(postfix="engine"), when="D", backupCount=3)
+    logging_handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
+    logging_handler.setLevel(logging.DEBUG)
+
+    self._logger.addHandler(logging_handler)
+    self._logger.propagate = False
+
     def newUpdateProgressDataCallback(old_callback, printer):
       def return_function(state_monitor):
         old_result = dd()
@@ -91,6 +104,9 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
         for regex in list(old_result["TimeToFilament"].keys()):
           if old_result["TimeToFilament"][regex]["matchPos"] == float("inf"):
             del old_result["TimeToFilament"][regex]
+        if (time.time() > self._last_debug + 10):
+          self._logger.info("sending: " + json.dumps(old_result))
+          self._last_debug = time.time()
         return old_result
       return return_function
     self._printer._stateMonitor._on_get_progress = types.MethodType(newUpdateProgressDataCallback(
