@@ -125,7 +125,7 @@ $(function() {
         } else {
           let found = document.getElementById("TimeToFilament-" + regex);
           if (found) {
-            document.getElementById("TimeToFilament").style.display = "none";
+            document.getElementById("TimeToFilament-" + regex).style.display = "none";
           }
         }
       }
