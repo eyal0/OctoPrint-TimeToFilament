@@ -57,7 +57,8 @@ $(function() {
         }
       }
       progress.completion = progress.filepos / self.sampleGcode().length;
-      progress.TimeToFilament = {};
+      plugins = {};
+      plugins.TimeToFilament = {};
       for (const displayLine of self.displayLines()) {
         const regex = displayLine.regex();
         const format = displayLine.format();
@@ -65,7 +66,7 @@ $(function() {
         let timeSoFar = 0;
         for (let line of self.sampleGcode().substr(progress.filepos).split("\n")) {
           if (m = line.match(regex)) {
-            progress.TimeToFilament[regex] = {
+            plugins.TimeToFilament[regex] = {
               "group": m[0],
               "groupdict": m.groups,
               "groups": m.slice(1),
@@ -78,12 +79,12 @@ $(function() {
           timeSoFar += [...line].reduce((a,b) => a+b.charCodeAt(0), 0);
         }
       }
-      return {"progress": progress};
+      return {"progress": progress, "plugins": plugins};
     });
 
     self.sampleFormatOutput = function(displayLineIndex) {
-      if (!(self.displayLines()[displayLineIndex()].regex() in self.sampleOutput()["progress"]["TimeToFilament"])) {
-        return "'" + self.displayLines()[displayLineIndex()].regex() + "' not found in this.progress.TimeToFilament";
+      if (!(self.displayLines()[displayLineIndex()].regex() in self.sampleOutput()["plugins"]["TimeToFilament"])) {
+        return "'" + self.displayLines()[displayLineIndex()].regex() + "' not found in this.plugins.TimeToFilament";
       }
       try {
         const fillTemplate = function(templateString, templateVars){
@@ -96,7 +97,7 @@ $(function() {
     }
 
     self.fromCurrentData = function(data) {
-      if (!("progress" in data) || !("TimeToFilament" in data["progress"])) {
+      if (!("plugins" in data) || !("TimeToFilament" in data["plugins"])) {
         let div = document.getElementById("TimeToFilament");
         if (div) {
           div.style.display = "none";
@@ -107,7 +108,7 @@ $(function() {
       const displayLines = self.displayLines();
       for (const displayLine of displayLines) {
         const regex = displayLine.regex();
-        if (regex in data["progress"]["TimeToFilament"]) {
+        if (regex in data["plugins"]["TimeToFilament"]) {
           let found = document.getElementById("TimeToFilament-" + regex);
           if (!found) {
             let newLine = document.createElement("span");
@@ -117,7 +118,7 @@ $(function() {
           }
           // Back to default which is probably to show it.
           document.getElementById("TimeToFilament").style.display = "";
-          result = data["progress"]["TimeToFilament"][regex];
+          result = data["plugins"]["TimeToFilament"][regex];
           const fillTemplate = function(templateString, templateVars){
             return new Function(`return \`${templateString}\`;`).call(templateVars);
           }

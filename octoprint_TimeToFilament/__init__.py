@@ -31,11 +31,11 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
             {"enabled": True,
              "description": "Time to Next Layer",
              "regex": "^; layer (\\d+)",
-             "format": 'Layer ${this.progress.TimeToFilament["^; layer (\\\\d+)"].groups[0]} in <b>${formatDuration(this.progress.printTimeLeft - this.progress.TimeToFilament["^; layer (\\\\d+)"].timeLeft)}</b>'},
+             "format": 'Layer ${this.plugins.TimeToFilament["^; layer (\\\\d+)"].groups[0]} in <b>${formatDuration(this.progress.printTimeLeft - this.plugins.TimeToFilament["^; layer (\\\\d+)"].timeLeft)}</b>'},
             {"enabled": True,
              "description": "Time to Next Filament Change",
              "regex": "^M600",
-             "format": 'Filament change in <b>${formatDuration(this.progress.printTimeLeft - this.progress.TimeToFilament["^M600"].timeLeft)}</b>'}
+             "format": 'Filament change in <b>${formatDuration(this.progress.printTimeLeft - this.plugins.TimeToFilament["^M600"].timeLeft)}</b>'}
         ]
     }
 
@@ -49,68 +49,6 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
 
     self._logger.addHandler(logging_handler)
     self._logger.propagate = False
-
-    def newUpdateProgressDataCallback(old_callback, printer):
-      def return_function(state_monitor):
-        old_result = dd()
-        # Get the results from the original callback, to be updated.
-        old_result.update(old_callback())
-        try:
-          # Can we use the cached result?
-          if printer._comm._currentFile is not self._cached_currentFile:
-            # No, we need to clear out the cache.
-            self._cached_results = dd()
-            self._cached_currentFile = printer._comm._currentFile
-          file_pos = printer._comm._currentFile.getFilepos()
-          for regex, cached_result in list(self._cached_results.items()):
-            if (file_pos > cached_result["matchPos"] or
-                file_pos < cached_result["searchPos"]):
-              del self._cached_results[regex]
-          old_result["TimeToFilament"].update(self._cached_results)
-          regexes = set(x["regex"]
-                        for x in self._settings.get(["displayLines"])
-                        if x["enabled"] and (x["regex"] not in old_result["TimeToFilament"].keys()))
-          if regexes:
-            with open(printer._comm._currentFile.getFilename()) as gcode_file:
-              gcode_file.seek(file_pos)
-              # Now search forward for the regex.
-              while regexes:
-                line = gcode_file.readline()
-                if not line:
-                  # Ran out of lines and didn't find anything more.
-                  for regex in list(regexes):
-                    self._cached_results[regex]["matchPos"] = float("inf")
-                    self._cached_results[regex]["searchPos"] = file_pos
-                  break
-                for regex in list(regexes): # Make a copy because we modify it.
-                  m = re.search(regex, line)
-                  if m:
-                    match_pos = gcode_file.tell()
-                    timeLeft, timeOrigin = printer._estimator.estimate(
-                        float(match_pos) / printer._comm._currentFile.getFilesize(),
-                        None, None, None, None)
-                    self._cached_results[regex] = {
-                        "timeLeft": timeLeft,
-                        "groups": m.groups(),
-                        "group": m.group(),
-                        "groupdict": m.groupdict(),
-                        "matchPos": match_pos,
-                        "searchPos": file_pos,
-                    }
-                    regexes.remove(regex)
-          old_result["TimeToFilament"].update(self._cached_results)
-        except Exception as e:
-          print("Failed: " + repr(e))
-        for regex in list(old_result["TimeToFilament"].keys()):
-          if old_result["TimeToFilament"][regex]["matchPos"] == float("inf"):
-            del old_result["TimeToFilament"][regex]
-        if (time.time() > self._last_debug + 10):
-          self._logger.info("sending: " + json.dumps(old_result))
-          self._last_debug = time.time()
-        return old_result
-      return return_function
-    self._printer._stateMonitor._on_get_progress = types.MethodType(newUpdateProgressDataCallback(
-        self._printer._stateMonitor._on_get_progress, self._printer), self._printer._stateMonitor)
 
   @octoprint.plugin.BlueprintPlugin.route("/get_settings_defaults", methods=["GET"])
   def get_settings_defaults_as_string(self):
@@ -148,6 +86,61 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
         )
     )
 
+  def additional_state_data(self, initial, *args, **kwargs):
+    try:
+      if not self._printer._comm._currentFile:
+        return None
+      # Can we use the cached result?
+      if self._printer._comm._currentFile is not self._cached_currentFile:
+        # No, we need to clear out the cache.
+        self._cached_results = dd()
+        self._cached_currentFile = self._printer._comm._currentFile
+      file_pos = self._printer._comm._currentFile.getFilepos()
+      for regex, cached_result in list(self._cached_results.items()):
+        if (file_pos > cached_result["matchPos"] or
+            file_pos < cached_result["searchPos"]):
+          del self._cached_results[regex]
+      regexes = set(x["regex"]
+                    for x in self._settings.get(["displayLines"])
+                    if x["enabled"] and (x["regex"] not in self._cached_results.keys()))
+      if regexes:
+        with open(self._printer._comm._currentFile.getFilename()) as gcode_file:
+          gcode_file.seek(file_pos)
+          # Now search forward for the regex.
+          while regexes:
+            line = gcode_file.readline()
+            if not line:
+              # Ran out of lines and didn't find anything more.
+              for regex in list(regexes):
+                self._cached_results[regex]["matchPos"] = float("inf")
+                self._cached_results[regex]["searchPos"] = file_pos
+              break
+            for regex in list(regexes): # Make a copy because we modify it.
+              m = re.search(regex, line)
+              if m:
+                match_pos = gcode_file.tell()
+                time_left, _ = self._printer._estimator.estimate(
+                    float(match_pos) / self._printer._comm._currentFile.getFilesize(),
+                    None, None, None, None)
+                self._cached_results[regex] = {
+                    "timeLeft": time_left,
+                    "groups": m.groups(),
+                    "group": m.group(),
+                    "groupdict": m.groupdict(),
+                    "matchPos": match_pos,
+                    "searchPos": file_pos,
+                }
+                regexes.remove(regex)
+      for regex in list(self._cached_results.keys()):
+        if self._cached_results[regex]["matchPos"] == float("inf"):
+          del self._cached_results[regex]
+      if (time.time() > self._last_debug + 10):
+        self._logger.info("sending: %s", json.dumps(self._cached_results))
+        self._last_debug = time.time()
+      return self._cached_results
+    except Exception as e:
+      self._logger.error("Failed: %s", repr(e))
+    return None
 
 # If you want your plugin to be registered within OctoPrint under a different name than what you defined in setup.py
 # ("OctoPrint-PluginSkeleton"), you may define that here. Same goes for the other metadata derived from setup.py that
@@ -162,5 +155,6 @@ def __plugin_load__():
 
   global __plugin_hooks__
   __plugin_hooks__ = {
-      "octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information
+      "octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information,
+      "octoprint.printer.additional_state_data": __plugin_implementation__.additional_state_data
   }
