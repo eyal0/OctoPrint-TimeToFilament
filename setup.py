@@ -33,7 +33,7 @@ plugin_url = "https://github.com/eyal0/OctoPrint-TimeToFilament"
 plugin_license = "AGPLv3"
 
 # Any additional requirements besides OctoPrint should be listed here
-plugin_requires = ["OctoPrint-PrintTimeGenius"]
+plugin_requires = ["OctoPrint-PrintTimeGenius", "OctoPrint>=1.5.0"]
 
 ### --------------------------------------------------------------------------------------------------------------------
 ### More advanced options that you usually shouldn't have to touch follow after this point
