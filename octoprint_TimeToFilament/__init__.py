@@ -87,6 +87,7 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
     )
 
   def additional_state_data(self, initial, *args, **kwargs):
+    return {"x": float("inf")}
     try:
       if not self._printer._comm._currentFile:
         return None
