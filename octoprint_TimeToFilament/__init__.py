@@ -1,6 +1,7 @@
 # coding=utf-8
 from __future__ import absolute_import
 
+import copy
 import types
 import re
 import octoprint.plugin
@@ -131,13 +132,14 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
                     "searchPos": file_pos,
                 }
                 regexes.remove(regex)
-      for regex in list(self._cached_results.keys()):
-        if self._cached_results[regex]["matchPos"] == float("inf"):
-          del self._cached_results[regex]
+      ret = copy.deepcopy(self._cached_results)
+      for regex in list(ret.keys()): # Make a copy because we will modify ret
+        if ret[regex]["matchPos"] == float("inf"):
+          del ret[regex]
       if (time.time() > self._last_debug + 10):
-        self._logger.info("sending: %s", json.dumps(self._cached_results))
+        self._logger.info("sending: %s", json.dumps(ret))
         self._last_debug = time.time()
-      return self._cached_results
+      return ret
     except Exception as e:
       self._logger.error("Failed: %s", repr(e))
     return None
