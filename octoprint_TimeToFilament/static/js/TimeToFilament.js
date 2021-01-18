@@ -22,7 +22,7 @@ $(function() {
           "; layer 1\n" +
           "M12345 more pretend stuff\n" +
           "M600 whatever\n");
-      printElement = document.evaluate('//*[@id="state"]/div/span[text() = "Printed"]', document);
+      printElement = document.evaluate('//*[@id="state"]/div/span[last()]', document);
       printElement = printElement.iterateNext();
       newDiv = document.createElement("div");
       newDiv.id = "TimeToFilament";
