@@ -104,29 +104,32 @@ $(function() {
         }
         return;
       }
-      document.getElementById("TimeToFilament").style.display = "";
       const displayLines = self.displayLines();
-      for (const displayLine of displayLines) {
+      for (let displayLineIndex = 0; displayLineIndex < displayLines.length; displayLineIndex++) {
+        const displayLine = displayLines[displayLineIndex];
         const regex = displayLine.regex();
-        if (regex in data["plugins"]["TimeToFilament"]) {
-          let found = document.getElementById("TimeToFilament-" + regex);
+        if (regex in data["plugins"]["TimeToFilament"] &&
+            data["plugins"]["TimeToFilament"][regex].timeLeft &&
+            displayLine.enabled()) {
+          let found = document.getElementById("TimeToFilament-" + displayLineIndex);
           if (!found) {
             let newLine = document.createElement("span");
-            newLine.id = "TimeToFilament-" + regex;
+            newLine.id = "TimeToFilament-" + displayLineIndex;
             newLine.style = "display: block;";
             document.getElementById("TimeToFilament").appendChild(newLine);
           }
           // Back to default which is probably to show it.
+          document.getElementById("TimeToFilament-" + displayLineIndex).style.display = "block";
           document.getElementById("TimeToFilament").style.display = "";
           result = data["plugins"]["TimeToFilament"][regex];
           const fillTemplate = function(templateString, templateVars){
             return new Function(`return \`${templateString}\`;`).call(templateVars);
           }
-          document.getElementById("TimeToFilament-" + regex).innerHTML = fillTemplate(displayLine.format(), data);
+          document.getElementById("TimeToFilament-" + displayLineIndex).innerHTML = fillTemplate(displayLine.format(), data);
         } else {
-          let found = document.getElementById("TimeToFilament-" + regex);
+          let found = document.getElementById("TimeToFilament-" + displayLineIndex);
           if (found) {
-            document.getElementById("TimeToFilament-" + regex).style.display = "none";
+            document.getElementById("TimeToFilament-" + displayLineIndex).style.display = "none";
           }
         }
       }
