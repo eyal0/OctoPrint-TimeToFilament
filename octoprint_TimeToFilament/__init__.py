@@ -1,5 +1,6 @@
 # coding=utf-8
 from __future__ import absolute_import
+from __future__ import division
 
 import copy
 import types
@@ -127,6 +128,7 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
                 time_left, _ = self._printer._estimator.estimate(
                     float(match_pos) / self._printer._comm._currentFile.getFilesize(),
                     None, None, None, None)
+                self._logger.info(f"estimate for position {match_pos} out of {self._printer._comm._currentFile.getFilesize()} is {time_left}.  Total print time is {self._printer._estimator.estimate(0, None, None, None, None)}.  Remaining print time is {self._printer._estimator.estimate(self._printer._comm._currentFile.getFilepos()/ self._printer._comm._currentFile.getFilesize(), None, None, None, None)}")
                 self._cached_results[regex] = {
                     "timeLeft": time_left,
                     "groups": m.groups(),
