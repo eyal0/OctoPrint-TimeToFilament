@@ -41,6 +41,14 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
              "description": "Time of Next Filament Change",
              "regex": "^M600",
              "format": 'Filament change at <b>${new Date(Date.now() + (this.progress.printTimeLeft - this.plugins.TimeToFilament["^M600"].timeLeft)*1000).toLocaleTimeString([], {hour12:false})}</b>'},
+            {"enabled": True,
+             "description": "Time to Next Next Pause",
+             "regex": "^M601",
+             "format": 'Next pause in <b>${formatDuration(this.progress.printTimeLeft - this.plugins.TimeToFilament["^M601"].timeLeft)}</b>'},
+            {"enabled": False,
+             "description": "Time of Next Next Pause",
+             "regex": "^M601",
+             "format": 'Next pause at <b>${new Date(Date.now() + (this.progress.printTimeLeft - this.plugins.TimeToFilament["^M601"].timeLeft)*1000).toLocaleTimeString([], {hour12:false})}</b>'},
         ]
     }
 
