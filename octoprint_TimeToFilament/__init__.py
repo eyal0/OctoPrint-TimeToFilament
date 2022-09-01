@@ -108,7 +108,7 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
         # No, we need to clear out the cache.
         self._cached_results = dd()
         self._cached_currentFile = self._printer._comm._currentFile
-      file_pos = self._printer._comm._currentFile.getFilepos()
+      file_pos = self._cached_currentFile.getFilepos()
       for regex, cached_result in list(self._cached_results.items()):
         if (file_pos > cached_result["matchPos"] or
             file_pos < cached_result["searchPos"]):
@@ -117,7 +117,7 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
                     for x in self._settings.get(["displayLines"])
                     if x["enabled"] and (x["regex"] not in self._cached_results.keys()))
       if regexes:
-        with open(self._printer._comm._currentFile.getFilename()) as gcode_file:
+        with open(self._cached_currentFile.getFilename()) as gcode_file:
           gcode_file.seek(file_pos)
           # Now search forward for the regex.
           while regexes:
@@ -133,7 +133,7 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
               if m:
                 match_pos = gcode_file.tell()
                 time_left, _ = self._printer._estimator.estimate(
-                    float(match_pos) / self._printer._comm._currentFile.getFilesize(),
+                    float(match_pos) / self._cached_currentFile.getFilesize(),
                     None, None, None, None)
                 self._cached_results[regex] = {
                     "timeLeft": time_left,
