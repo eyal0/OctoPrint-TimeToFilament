@@ -127,13 +127,22 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
         self._cached_results = dd()
         self._cached_currentFile = self._printer._comm._currentFile
       file_pos = self._cached_currentFile.getFilepos()
-      for regex, cached_result in list(self._cached_results.items()):
-        if (file_pos > cached_result["matchPos"] or
-            file_pos < cached_result["searchPos"]):
-          del self._cached_results[regex]
+      # First, make the cache valid for all regexes that we care about:
+      for display_line in self._settings.get(["displayLines"]):
+        regex = display_line["regex"]
+        if regex not in self._cached_results:
+          self._cached_results[regex]["timeLeft"] = None
+          self._cached_results[regex]["groups"] = None
+          self._cached_results[regex]["group"] = None
+          self._cached_results[regex]["groupdict"] = None
+          self._cached_results[regex]["matchPos"] = -1 # before start of file
+          self._cached_results[regex]["searchPos"] = 0
+      # Regexes to look for.
       regexes = set(x["regex"]
                     for x in self._settings.get(["displayLines"])
-                    if x["enabled"] and (x["regex"] not in self._cached_results.keys()))
+                    if (x["enabled"] and
+                        (file_pos > self._cached_results[x["regex"]]["matchPos"] or
+                         file_pos < self._cached_results[x["regex"]]["searchPos"])))
       if regexes:
         with open(self._cached_currentFile.getFilename()) as gcode_file:
           gcode_file.seek(file_pos)
@@ -153,14 +162,12 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
                 time_left, _ = self._printer._estimator.estimate(
                     float(match_pos) / self._cached_currentFile.getFilesize(),
                     None, None, None, None)
-                self._cached_results[regex] = {
-                    "timeLeft": time_left,
-                    "groups": m.groups(),
-                    "group": m.group(),
-                    "groupdict": m.groupdict(),
-                    "matchPos": match_pos,
-                    "searchPos": file_pos,
-                }
+                self._cached_results[regex]["timeLeft"] = time_left
+                self._cached_results[regex]["groups"] = m.groups()
+                self._cached_results[regex]["group"] = m.group()
+                self._cached_results[regex]["groupdict"] = m.groupdict()
+                self._cached_results[regex]["matchPos"] = match_pos
+                self._cached_results[regex]["searchPos"] = file_pos
                 regexes.remove(regex)
       ret = copy.deepcopy(self._cached_results)
       for regex in list(ret.keys()): # Make a copy because we will modify ret
