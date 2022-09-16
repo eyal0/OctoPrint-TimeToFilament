@@ -37,7 +37,12 @@ $(function() {
     }
 
     self.addLine = function() {
-      self.displayLines.push(ko.mapping.fromJS({description: "", regex: "", format: "", enabled: true}));
+      self.displayLines.push(ko.mapping.fromJS({
+        description: "",
+        regex: "",
+        format: "",
+        enabled: true,
+      }));
     }
 
     self.removeLine = function(line) {
