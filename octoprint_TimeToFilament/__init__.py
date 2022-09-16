@@ -101,6 +101,9 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
 
   def additional_state_data(self, initial, *args, **kwargs):
     try:
+      if not hasattr(self, "_printer"):
+        # The printer object wasn't yet loaded.
+        return None
       if not self._printer._comm._currentFile:
         return None
       # Can we use the cached result?
