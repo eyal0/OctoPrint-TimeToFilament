@@ -42,6 +42,7 @@ $(function() {
         regex: "",
         format: "",
         enabled: true,
+        uses_count: false,
       }));
     }
 

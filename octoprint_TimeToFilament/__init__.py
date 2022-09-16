@@ -34,30 +34,35 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
               "description": "Time to Next Layer",
               "regex": "^; layer (\\d+)",
               "format": 'Layer ${this.plugins.TimeToFilament["^; layer (\\\\d+)"].groups[0]} in <b>${formatDuration(this.progress.printTimeLeft - this.plugins.TimeToFilament["^; layer (\\\\d+)"].timeLeft)}</b>'
+              "uses_count": False,
             },
             {
               "enabled": True,
               "description": "Time to Next Filament Change",
               "regex": "^M600",
               "format": 'Filament change in <b>${formatDuration(this.progress.printTimeLeft - this.plugins.TimeToFilament["^M600"].timeLeft)}</b>'
+              "uses_count": False,
             },
             {
               "enabled": False,
               "description": "Time of Next Filament Change",
               "regex": "^M600",
               "format": 'Filament change at <b>${new Date(Date.now() + (this.progress.printTimeLeft - this.plugins.TimeToFilament["^M600"].timeLeft)*1000).toLocaleTimeString([], {hour12:false})}</b>'
+              "uses_count": False,
             },
             {
               "enabled": True,
               "description": "Time to Next Next Pause",
               "regex": "^M601",
               "format": 'Next pause in <b>${formatDuration(this.progress.printTimeLeft - this.plugins.TimeToFilament["^M601"].timeLeft)}</b>'
+              "uses_count": False,
             },
             {
               "enabled": False,
               "description": "Time of Next Next Pause",
               "regex": "^M601",
               "format": 'Next pause at <b>${new Date(Date.now() + (this.progress.printTimeLeft - this.plugins.TimeToFilament["^M601"].timeLeft)*1000).toLocaleTimeString([], {hour12:false})}</b>'
+              "uses_count": False,
             },
         ]
     }
