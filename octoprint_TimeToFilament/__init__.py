@@ -29,26 +29,41 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
   def get_settings_defaults(self):
     return {
         "displayLines": [
-            {"enabled": True,
-             "description": "Time to Next Layer",
-             "regex": "^; layer (\\d+)",
-             "format": 'Layer ${this.plugins.TimeToFilament["^; layer (\\\\d+)"].groups[0]} in <b>${formatDuration(this.progress.printTimeLeft - this.plugins.TimeToFilament["^; layer (\\\\d+)"].timeLeft)}</b>'},
-            {"enabled": True,
-             "description": "Time to Next Filament Change",
-             "regex": "^M600",
-             "format": 'Filament change in <b>${formatDuration(this.progress.printTimeLeft - this.plugins.TimeToFilament["^M600"].timeLeft)}</b>'},
-            {"enabled": False,
-             "description": "Time of Next Filament Change",
-             "regex": "^M600",
-             "format": 'Filament change at <b>${new Date(Date.now() + (this.progress.printTimeLeft - this.plugins.TimeToFilament["^M600"].timeLeft)*1000).toLocaleTimeString([], {hour12:false})}</b>'},
-            {"enabled": True,
-             "description": "Time to Next Next Pause",
-             "regex": "^M601",
-             "format": 'Next pause in <b>${formatDuration(this.progress.printTimeLeft - this.plugins.TimeToFilament["^M601"].timeLeft)}</b>'},
-            {"enabled": False,
-             "description": "Time of Next Next Pause",
-             "regex": "^M601",
-             "format": 'Next pause at <b>${new Date(Date.now() + (this.progress.printTimeLeft - this.plugins.TimeToFilament["^M601"].timeLeft)*1000).toLocaleTimeString([], {hour12:false})}</b>'},
+            {
+              "enabled": True,
+              "description": "Time to Next Layer",
+              "regex": "^; layer (\\d+)",
+              "format": 'Layer ${this.plugins.TimeToFilament["^; layer (\\\\d+)"].groups[0]} in <b>${formatDuration(this.progress.printTimeLeft - this.plugins.TimeToFilament["^; layer (\\\\d+)"].timeLeft)}</b>'
+              "uses_count": False,
+            },
+            {
+              "enabled": True,
+              "description": "Time to Next Filament Change",
+              "regex": "^M600",
+              "format": 'Filament change in <b>${formatDuration(this.progress.printTimeLeft - this.plugins.TimeToFilament["^M600"].timeLeft)}</b>'
+              "uses_count": False,
+            },
+            {
+              "enabled": False,
+              "description": "Time of Next Filament Change",
+              "regex": "^M600",
+              "format": 'Filament change at <b>${new Date(Date.now() + (this.progress.printTimeLeft - this.plugins.TimeToFilament["^M600"].timeLeft)*1000).toLocaleTimeString([], {hour12:false})}</b>'
+              "uses_count": False,
+            },
+            {
+              "enabled": True,
+              "description": "Time to Next Next Pause",
+              "regex": "^M601",
+              "format": 'Next pause in <b>${formatDuration(this.progress.printTimeLeft - this.plugins.TimeToFilament["^M601"].timeLeft)}</b>'
+              "uses_count": False,
+            },
+            {
+              "enabled": False,
+              "description": "Time of Next Next Pause",
+              "regex": "^M601",
+              "format": 'Next pause at <b>${new Date(Date.now() + (this.progress.printTimeLeft - this.plugins.TimeToFilament["^M601"].timeLeft)*1000).toLocaleTimeString([], {hour12:false})}</b>'
+              "uses_count": False,
+            },
         ]
     }
 
@@ -101,6 +116,9 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
 
   def additional_state_data(self, initial, *args, **kwargs):
     try:
+      if not hasattr(self, "_printer"):
+        # The printer object wasn't yet loaded.
+        return None
       if not self._printer._comm._currentFile:
         return None
       # Can we use the cached result?
@@ -108,17 +126,35 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
         # No, we need to clear out the cache.
         self._cached_results = dd()
         self._cached_currentFile = self._printer._comm._currentFile
+      # Where we are in the file right now.
       file_pos = self._cached_currentFile.getFilepos()
-      for regex, cached_result in list(self._cached_results.items()):
-        if (file_pos > cached_result["matchPos"] or
-            file_pos < cached_result["searchPos"]):
-          del self._cached_results[regex]
-      regexes = set(x["regex"]
-                    for x in self._settings.get(["displayLines"])
-                    if x["enabled"] and (x["regex"] not in self._cached_results.keys()))
+      # First, make the cache valid for all regexes that we care about:
+      for display_line in self._settings.get(["displayLines"]):
+        regex = display_line["regex"]
+        uses_count = self._settings.get(["displayLines"])[regex]["uses_count"]
+        if (regex, uses_count) not in self._cached_results:
+          self._cached_results[regex]["timeLeft"] = None
+          self._cached_results[regex]["groups"] = None
+          self._cached_results[regex]["group"] = None
+          self._cached_results[regex]["groupdict"] = None
+          self._cached_results[regex]["matchPos"] = -1 # before start of file
+          self._cached_results[regex]["searchPos"] = 0
+          if uses_count:
+            self._cached_results[regex]["count"] = 0
+      start_pos = file_pos
+      for (regex, uses_count), cached_result in self._cached_results.items():
+        if "count" in cached_result:
+          # This regex needs to know the count.
+          start_pos = min(start_pos, cached_result["matchPos"])
+      start_pos = max(0, start_pos) # At least 0.
+      # These are the ones that we need to search for again.
+      regexes = set(regex
+                    for regex, cached_result in self._cached_results.items()
+                    if (file_pos > cached_result["matchPos"] or
+                        file_pos < cached_result["searchPos"]))
       if regexes:
         with open(self._cached_currentFile.getFilename()) as gcode_file:
-          gcode_file.seek(file_pos)
+          gcode_file.seek(start_pos)
           # Now search forward for the regex.
           while regexes:
             line = gcode_file.readline()
@@ -126,24 +162,29 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
               # Ran out of lines and didn't find anything more.
               for regex in list(regexes):
                 self._cached_results[regex]["matchPos"] = float("inf")
-                self._cached_results[regex]["searchPos"] = file_pos
+                self._cached_results[regex]["searchPos"] = start_pos
               break
+            match_pos = gcode_file.tell()
             for regex in list(regexes): # Make a copy because we modify it.
               m = re.search(regex, line)
               if m:
-                match_pos = gcode_file.tell()
-                time_left, _ = self._printer._estimator.estimate(
+                if (self._settings.get(["displayLines"])["uses_count"] and
+                    (regex not in self._cached_results or
+                     "searchPos" not in self._cached_results
+                    match_pos > self._cached_results[regex]["searchPos"]):
+                  self._cached_results[regex]["count"] = (
+                    (self._cached_results[regex]["count"] or 0) + 1)
+                if match_pos > file_pos:
+                  time_left, _ = self._printer._estimator.estimate(
                     float(match_pos) / self._cached_currentFile.getFilesize(),
                     None, None, None, None)
-                self._cached_results[regex] = {
-                    "timeLeft": time_left,
-                    "groups": m.groups(),
-                    "group": m.group(),
-                    "groupdict": m.groupdict(),
-                    "matchPos": match_pos,
-                    "searchPos": file_pos,
-                }
-                regexes.remove(regex)
+                  self._cached_results[regex]["timeLeft"] = time_left
+                  self._cached_results[regex]["groups"] = m.groups()
+                  self._cached_results[regex]["group"] = m.group()
+                  self._cached_results[regex]["groupdict"] = m.groupdict()
+                  self._cached_results[regex]["matchPos"] = match_pos
+                  self._cached_results[regex]["searchPos"] = start_pos
+                  regexes.remove(regex)
       ret = copy.deepcopy(self._cached_results)
       for regex in list(ret.keys()): # Make a copy because we will modify ret
         if ret[regex]["matchPos"] == float("inf"):
