@@ -19,3 +19,6 @@ the plugin manager.
 ## Configuration
 
 **TODO:** Describe your plugin's configuration options (if any).
+
+## API
+`TimeToFilament` provides an API to get the values from an external application, e.g. OctoDash. It can be retrieved using `http://octopi.local/plugin/TimeToFilament/`.

@@ -24,8 +24,10 @@
       <div class="control-group">
         <label class="control-label">Description</label> <div class="controls"><input type="text" class="input-block-level" data-bind="textInput: description"></div>
         <label class="control-label">Regex</label> <div class="controls"><input type="text" class="input-block-level" data-bind="textInput: regex"></div>
-        <label class="control-label">Format</label> <div class="controls"><textarea rows=3 class="input-block-level" data-bind="textInput: format"></textarea></div>
-        <label class="control-label">Enabled</label> <div class="controls"><input type="checkbox" style="margin-left: 20px" data-bind="checked: enabled"></div><br>
+        <label class="control-label">Format (UI)</label> <div class="controls"><textarea rows=3 class="input-block-level" data-bind="textInput: format"></textarea></div>
+		<label class="control-label">Format (External)</label> <div class="controls"><textarea rows=3 class="input-block-level" data-bind="textInput: formatExternal"></textarea></div>
+        <label class="control-label">Enabled (UI)</label> <div class="controls"><input type="checkbox" style="margin-left: 20px" data-bind="checked: enabled"></div><br>
+		<label class="control-label">Enabled (External)</label> <div class="controls"><input type="checkbox" style="margin-left: 20px" data-bind="checked: enabledExternal"></div><br>
         <label class="control-label">Sample Output</label> <div class="controls"><div class="input-block-level" data-bind="html: $parent.sampleFormatOutput($index)"></div></div>
       </div>
     </div>

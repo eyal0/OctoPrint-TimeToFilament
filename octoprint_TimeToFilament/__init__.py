@@ -8,7 +8,9 @@ import octoprint.plugin
 import json
 import logging
 import time
+import flask
 from collections import defaultdict
+from octoprint.util import dict_merge
 
 dd = lambda: defaultdict(dd)
 
@@ -18,6 +20,8 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
                            octoprint.plugin.TemplatePlugin,
                            octoprint.plugin.StartupPlugin,
                            octoprint.plugin.BlueprintPlugin):
+
+  variables = dict()
 
   def __init__(self):
     self._logger = logging.getLogger(__name__)
@@ -30,28 +34,37 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
     return {
         "displayLines": [
             {"enabled": True,
+             "enabledExternal": True,
              "description": "Time to Next Layer",
              "regex": "^; layer (\\d+)",
-             "format": 'Layer ${this.plugins.TimeToFilament["^; layer (\\\\d+)"].groups[0]} in <b>${formatDuration(this.progress.printTimeLeft - this.plugins.TimeToFilament["^; layer (\\\\d+)"].timeLeft)}</b>'},
+             "format": 'Layer ${this.plugins.TimeToFilament["^; layer (\\\\d+)"].groups[0]} in <b>${formatDuration(this.progress.printTimeLeft - this.plugins.TimeToFilament["^; layer (\\\\d+)"].timeLeft)}</b>',
+             "formatExternal": ""},
             {"enabled": True,
+             "enabledExternal": True,
              "description": "Time to Next Filament Change",
              "regex": "^M600",
-             "format": 'Filament change in <b>${formatDuration(this.progress.printTimeLeft - this.plugins.TimeToFilament["^M600"].timeLeft)}</b>'},
+             "format": 'Filament change in <b>${formatDuration(this.progress.printTimeLeft - this.plugins.TimeToFilament["^M600"].timeLeft)}</b>',
+             "formatExternal": ""},
             {"enabled": False,
+             "enabledExternal": False,
              "description": "Time of Next Filament Change",
              "regex": "^M600",
-             "format": 'Filament change at <b>${new Date(Date.now() + (this.progress.printTimeLeft - this.plugins.TimeToFilament["^M600"].timeLeft)*1000).toLocaleTimeString([], {hour12:false})}</b>'},
+             "format": 'Filament change at <b>${new Date(Date.now() + (this.progress.printTimeLeft - this.plugins.TimeToFilament["^M600"].timeLeft)*1000).toLocaleTimeString([], {hour12:false})}</b>',
+             "formatExternal": ""},
             {"enabled": True,
+             "enabledExternal": True,
              "description": "Time to Next Next Pause",
              "regex": "^M601",
-             "format": 'Next pause in <b>${formatDuration(this.progress.printTimeLeft - this.plugins.TimeToFilament["^M601"].timeLeft)}</b>'},
+             "format": 'Next pause in <b>${formatDuration(this.progress.printTimeLeft - this.plugins.TimeToFilament["^M601"].timeLeft)}</b>',
+             "formatExternal": ""},
             {"enabled": False,
+             "enabledExternal": False,
              "description": "Time of Next Next Pause",
              "regex": "^M601",
-             "format": 'Next pause at <b>${new Date(Date.now() + (this.progress.printTimeLeft - this.plugins.TimeToFilament["^M601"].timeLeft)*1000).toLocaleTimeString([], {hour12:false})}</b>'},
+             "format": 'Next pause at <b>${new Date(Date.now() + (this.progress.printTimeLeft - this.plugins.TimeToFilament["^M601"].timeLeft)*1000).toLocaleTimeString([], {hour12:false})}</b>',
+             "formatExternal": ""},
         ]
     }
-
   ##~~ StartupPlugin API
   def on_startup(self, host, port):
      # setup our custom logger
@@ -66,6 +79,33 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
   @octoprint.plugin.BlueprintPlugin.route("/get_settings_defaults", methods=["GET"])
   def get_settings_defaults_as_string(self):
     return json.dumps(self.get_settings_defaults())
+    
+  def is_blueprint_csrf_protected(self):
+    return True
+    
+  @octoprint.plugin.BlueprintPlugin.route("/", methods=["GET"])
+  def get_cache(self):
+    if self._printer.get_state_id() not in (["PRINTING", "PAUSED"]):
+      return flask.jsonify(None)
+    addData = self.additional_state_data(False)
+    dispLines = self._settings.get(["displayLines"])
+    for idx, line in enumerate(dispLines):
+      dispLines[idx] = dict_merge(line, addData[line["regex"]])
+      if "timeLeft" in dispLines[idx]:
+        dispLines[idx]["timeLeft"] = max(self._printer.get_current_data()["progress"]["printTimeLeft"]-dispLines[idx]["timeLeft"],0)
+        import datetime
+        dispLines[idx]["timeLeftFormatted"] = str(datetime.timedelta(seconds=dispLines[idx]["timeLeft"])).split('.', 2)[0]
+        dispLines[idx]["dateTimeFinished"] = (datetime.datetime.now()-datetime.timedelta(seconds=dispLines[idx]["timeLeft"])).strftime("%H:%M:%S")
+      if "searchPos" in dispLines[idx]:
+        dispLines[idx]["searchPos"] = self._printer._comm._currentFile.getFilepos()
+      from jinja2 import Environment, BaseLoader
+      env = Environment(loader=BaseLoader()).from_string(dispLines[idx]["formatExternal"])
+      variables = dict_merge(dispLines[idx], __builtins__)
+      try:
+        dispLines[idx]["formatExternalCalc"] = env.render(variables)
+      except Exception as e:
+        return str(e)
+    return flask.jsonify(dispLines)
 
   ##~~ AssetPlugin mixin
   def get_assets(self):
