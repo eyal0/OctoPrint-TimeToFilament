@@ -21,8 +21,6 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
                            octoprint.plugin.StartupPlugin,
                            octoprint.plugin.BlueprintPlugin):
 
-  variables = dict()
-
   def __init__(self):
     self._logger = logging.getLogger(__name__)
     self._last_debug = 0
@@ -83,29 +81,29 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
   def is_blueprint_csrf_protected(self):
     return True
     
-  @octoprint.plugin.BlueprintPlugin.route("/", methods=["GET"])
-  def get_cache(self):
+  @octoprint.plugin.BlueprintPlugin.route("/api", methods=["GET"])
+  def api(self):
     if self._printer.get_state_id() not in (["PRINTING", "PAUSED"]):
       return flask.jsonify(None)
-    addData = self.additional_state_data(False)
-    dispLines = self._settings.get(["displayLines"])
-    for idx, line in enumerate(dispLines):
-      dispLines[idx] = dict_merge(line, addData[line["regex"]])
-      if "timeLeft" in dispLines[idx]:
-        dispLines[idx]["timeLeft"] = max(self._printer.get_current_data()["progress"]["printTimeLeft"]-dispLines[idx]["timeLeft"],0)
+    add_data = self.additional_state_data(False)
+    disp_lines = self._settings.get(["displayLines"])
+    for idx, line in enumerate(disp_lines):
+      disp_lines[idx] = dict_merge(line, add_data[line["regex"]])
+      if "timeLeft" in disp_lines[idx]:
+        disp_lines[idx]["timeLeft"] = max(self._printer.get_current_data()["progress"]["printTimeLeft"]-disp_lines[idx]["timeLeft"],0)
         import datetime
-        dispLines[idx]["timeLeftFormatted"] = str(datetime.timedelta(seconds=dispLines[idx]["timeLeft"])).split('.', 2)[0]
-        dispLines[idx]["dateTimeFinished"] = (datetime.datetime.now()-datetime.timedelta(seconds=dispLines[idx]["timeLeft"])).strftime("%H:%M:%S")
-      if "searchPos" in dispLines[idx]:
-        dispLines[idx]["searchPos"] = self._printer._comm._currentFile.getFilepos()
+        disp_lines[idx]["timeLeftFormatted"] = str(datetime.timedelta(seconds=disp_lines[idx]["timeLeft"])).split('.', 2)[0]
+        disp_lines[idx]["dateTimeFinished"] = (datetime.datetime.now()+datetime.timedelta(seconds=disp_lines[idx]["timeLeft"])).strftime("%H:%M:%S")
+      if "searchPos" in disp_lines[idx]:
+        disp_lines[idx]["searchPos"] = self._printer._comm._currentFile.getFilepos()
       from jinja2 import Environment, BaseLoader
-      env = Environment(loader=BaseLoader()).from_string(dispLines[idx]["formatExternal"])
-      variables = dict_merge(dispLines[idx], __builtins__)
+      env = Environment(loader=BaseLoader()).from_string(disp_lines[idx]["formatExternal"])
+      jinja_variables = dict_merge(disp_lines[idx], __builtins__)
       try:
-        dispLines[idx]["formatExternalCalc"] = env.render(variables)
+        disp_lines[idx]["formatExternalCalc"] = env.render(jinja_variables)
       except Exception as e:
         return str(e)
-    return flask.jsonify(dispLines)
+    return flask.jsonify(disp_lines)
 
   ##~~ AssetPlugin mixin
   def get_assets(self):
