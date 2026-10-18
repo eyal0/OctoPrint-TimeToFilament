@@ -15,6 +15,26 @@ from octoprint.util import dict_merge
 dd = lambda: defaultdict(dd)
 
 
+def _interpolate_time_left(curve, progress):
+  """Return remaining seconds from PTG's [file_progress, time_left] curve."""
+  if not curve:
+    return None
+  if progress <= curve[0][0]:
+    return float(curve[0][1])
+  if progress >= curve[-1][0]:
+    return float(curve[-1][1])
+
+  for idx in range(1, len(curve)):
+    right_progress, right_time = curve[idx]
+    if progress <= right_progress:
+      left_progress, left_time = curve[idx - 1]
+      if right_progress == left_progress:
+        return float(right_time)
+      fraction = float(progress - left_progress) / (right_progress - left_progress)
+      return float(left_time) + fraction * (float(right_time) - float(left_time))
+  return None
+
+
 class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
                            octoprint.plugin.AssetPlugin,
                            octoprint.plugin.TemplatePlugin,
@@ -95,7 +115,7 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
         disp_lines[idx]["timeLeftFormatted"] = str(datetime.timedelta(seconds=disp_lines[idx]["timeLeft"])).split('.', 2)[0]
         disp_lines[idx]["dateTimeFinished"] = (datetime.datetime.now()+datetime.timedelta(seconds=disp_lines[idx]["timeLeft"])).strftime("%H:%M:%S")
       if "searchPos" in disp_lines[idx]:
-        disp_lines[idx]["searchPos"] = self._printer._comm._currentFile.getFilepos()
+        disp_lines[idx]["searchPos"] = self._cached_currentFile.getFilepos()
       from jinja2 import Environment, BaseLoader
       env = Environment(loader=BaseLoader()).from_string(disp_lines[idx]["formatExternal"])
       jinja_variables = dict_merge(disp_lines[idx], __builtins__)
@@ -139,7 +159,7 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
 
   def additional_state_data(self, initial, *args, **kwargs):
     try:
-      if not self._printer._comm._currentFile:
+      if self._printer._comm is None or self._printer._comm._currentFile is None:
         return None
       # Can we use the cached result?
       if self._printer._comm._currentFile is not self._cached_currentFile:
@@ -170,9 +190,23 @@ class TimeToFilamentPlugin(octoprint.plugin.SettingsPlugin,
               m = re.search(regex, line)
               if m:
                 match_pos = gcode_file.tell()
-                time_left, _ = self._printer._estimator.estimate(
-                    float(match_pos) / self._cached_currentFile.getFilesize(),
-                    None, None, None, None)
+                match_progress = float(match_pos) / self._cached_currentFile.getFilesize()
+                time_left = None
+                try:
+                  # Use the same analyzed curve as PrintTimeGenius without
+                  # changing the state of the live print-time estimator.
+                  job_file = self._printer.get_current_job()["file"]
+                  metadata = self._file_manager.get_metadata(
+                      job_file["origin"], job_file["path"])
+                  curve = (metadata or {}).get("analysis", {}).get("progress")
+                  time_left = _interpolate_time_left(curve, match_progress)
+                except Exception as e:
+                  self._logger.debug("No PTG progress curve: %s", repr(e))
+
+                # Keep the original estimator behavior if no analysis is available.
+                if time_left is None:
+                  time_left, _ = self._printer._estimator.estimate(
+                      match_progress, None, None, None, None)
                 self._cached_results[regex] = {
                     "timeLeft": time_left,
                     "groups": m.groups(),
